@@ -1,0 +1,61 @@
+name: Update Devlog Index
+
+on:
+  push:
+    paths:
+      - "2026-*.md"
+      - ".github/workflows/update-devlog-index.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-devlog-index:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout devlog repo
+        uses: actions/checkout@v5
+
+      - name: Generate devlogs.json
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          from datetime import datetime
+
+          files = sorted(
+              [file for file in os.listdir(".") if file.startswith("2026-") and file.endswith(".md")],
+              reverse=True
+          )
+
+          devlogs = []
+
+          for file in files:
+              date_part = file.replace(".md", "")
+              date_obj = datetime.strptime(date_part, "%Y-%m-%d")
+
+              devlogs.append({
+                  "title": date_obj.strftime("%B %-d, %Y"),
+                  "file": file
+              })
+
+          with open("devlogs.json", "w") as f:
+              json.dump(devlogs, f, indent=2)
+
+              f.write("\n")
+          PY
+
+      - name: Commit updated devlog index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add devlogs.json
+
+          if git diff --cached --quiet; then
+            echo "No devlog index changes to commit."
+          else
+            git commit -m "docs: update devlog index"
+            git push
+          fi
